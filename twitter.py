@@ -13,8 +13,13 @@ url = "https://api.twitter.com/1.1/statuses/user_timeline.json"
 def GetTweet(name, count, since="", max=""):
     twitter = OAuth1Session(CK, CS, AT, AS)
 
-    params = {'screen_name' : name, 'count' : count, 'since_id' : since, 'max_id' : max}
+    params = {'screen_name' : name, 'count' : count}
+    if int(since) > 0:
+        params.update ({'since_id' : since})
+    if int(max) > 0:
+        params.update ({'max_id' : max})
 
+    print (params)
     res = twitter.get(url, params = params)
 
     logger.info("status="+str(res.status_code)+
@@ -27,12 +32,12 @@ def GetTweet(name, count, since="", max=""):
     if int(res.headers['x-rate-limit-remaining']) > 100:
         if res.status_code == 200:
             timeline = json.loads(res.text)
-            for tweet in timeline:
-                #print(str(tweet['user']['id'])+'::'+tweet['user']['name']+'::'+str(tweet['id'])+'::'+tweet['text'])
-                #print(tweet['created_at'])
+            #for tweet in timeline:
+                # print(str(tweet['user']['id'])+'::'+tweet['user']['name']+'::'+str(tweet['id'])+'::'+tweet['text'])
+                # print(tweet['created_at'])
                 #insertAccount(tweet['user']['id'], tweet['user']['screen_name'], tweet['user']['name'])
                 #insertTweet(tweet['user']['id'], tweet['id'], tweet['text'], tweet['created_at'])
-            print("success")
+            print ("Tweet Get success")
         else:
             print("ERROR: %d" %res.status_code)
 
@@ -44,24 +49,70 @@ def GetTweetFull(name):
     if min_max is not None:
         since = min_max[0]
         max = min_max[1]
-        
-    res = GetTweet(name, 100, since)
 
-    if int(res.headers['x-rate-limit-remaining']) > 100:
+    # 最新ツイートを取得
+    exists_flg = False
+    max = 0
+    while(True):
+        res = GetTweet(name, 10, since, max-1)
+
         if res.status_code == 200:
             timeline = json.loads(res.text)
             for tweet in timeline:
                 print(str(tweet['user']['id'])+'::'+tweet['user']['name']+'::'+str(tweet['id'])+'::'+tweet['text'])
                 print(tweet['created_at'])
                 if ExistsTweet(tweet['id']):
+                    exists_flg = True
                     break
-                #insertAccount(tweet['user']['id'], tweet['user']['screen_name'], tweet['user']['name'])
-                #insertTweet(tweet['user']['id'], tweet['id'], tweet['text'], tweet['created_at'])
-            print("success")
+                insertAccount(tweet['user']['id'], tweet['user']['screen_name'], tweet['user']['name'])
+                insertTweet(tweet['user']['id'], tweet['id'], tweet['text'], tweet['created_at'])
+                max = tweet['id']
+            print("New Tweet Get success")
+
+            # すでに取得していたら終了
+            if exists_flg:
+                break
+
+            # 残り回数がある程度ある限り繰り返す
+            if int(res.headers['x-rate-limit-remaining']) > 100:
+                continue
+            else:
+                print("few value limit remaining")
+                break
         else:
             print("ERROR: %d" %res.status_code)
+            break
 
-    for tweet in timeline:
+    if min_max is not None:
+        max = int(min_max[0])
+    # 過去ツイートを取得
+    exists_flg = False
+    while(True):
+        res = GetTweet(name, 10, 0, max-1)
+
+        if res.status_code == 200:
+            timeline = json.loads(res.text)
+            if timeline is None:
+                break
+
+            for tweet in timeline:
+                print(str(tweet['user']['id'])+'::'+tweet['user']['name']+'::'+str(tweet['id'])+'::'+tweet['text'])
+                print(tweet['created_at'])
+                if ExistsTweet(tweet['id']):
+                    continue
+                insertAccount(tweet['user']['id'], tweet['user']['screen_name'], tweet['user']['name'])
+                insertTweet(tweet['user']['id'], tweet['id'], tweet['text'], tweet['created_at'])
+                max = tweet['id']
+            print("success")
+            if int(res.headers['x-rate-limit-remaining']) > 100:
+                continue
+            else:
+                print("few value limit remaining")
+                break
+        else:
+            print("ERROR: %d" %res.status_code)
+            break
+    #for tweet in timeline:
 
 
         #print(str(tweet['user']['id'])+'::'+tweet['user']['name']+'::'+str(tweet['id'])+'::'+tweet['text'])

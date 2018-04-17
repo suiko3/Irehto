@@ -2,23 +2,12 @@
 # coding:utf-8
 
 import sys
-import mysql.connector
 from common import *
 from pytz import timezone
 from dateutil import parser
 from datetime import datetime
 
-# DB コネクション設定
-def dbconnection():
-    cnn = mysql.connector.connect(host='localhost',
-                                  port=3306,
-                                  db='irehtodb',
-                                  user='suiko',
-                                  passwd='yosi8021',
-                                  charset="utf8")
-    return cnn
-
-
+# DB アカウント情報登録
 def insertAccount(user_id, user, screen_name):
     result = 0
 
@@ -56,7 +45,7 @@ def insertAccount(user_id, user, screen_name):
 
     return result
 
-
+# ツイート内容登録
 def insertTweet(user_id, tweet_id, tweet, date_tweet):
     result = 0
 
@@ -94,6 +83,101 @@ def insertTweet(user_id, tweet_id, tweet, date_tweet):
         cnn.close()
 
     return result
+
+# ツイートデータ取得
+def selectTweet(user):
+    result = 0
+
+    try:
+        cnn = dbconnection()
+        cur = cnn.cursor()
+
+        sql = """SELECT tw.* FROM tweet as tw INNER JOIN account as ac ON tw.user_id = ac.user_id
+                   WHERE ac.user = %s AND tw.read_flg = 0 ORDER BY tw.date_tweet LIMIT 100"""
+
+        cur.execute(sql, (user,))
+        loggerJSON.debug("sql="+str(cur._executed))
+        rows = cur.fetchall()
+        logger.info("ExistCheck_tweet="+str(rows[0]))
+
+        # for row in rows:
+        #     print (row)
+            #print("%d %s" % (row[0], row[1]))
+
+        #date_created = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        #jst_tweet_time = parser.parse(date_tweet).astimezone(timezone('Asia/Tokyo')).strftime("%Y-%m-%d %H:%M:%S")
+
+        # 存在しなければinsertする
+        # if rows[0] == 0:
+        #     sql = """INSERT INTO tweet (user_id, tweet_id, tweet, date_tweet, date_created, date_changed)
+        #                           VALUES (%s, %s, %s, %s, cast(now() as datetime), cast(now() as datetime))"""
+        #
+        #     cur.execute(sql, (user_id, tweet_id, tweet, jst_tweet_time))
+        #     loggerJSON.debug("sql="+str(cur._executed))
+        #     cnn.commit()
+        #     print("tweet add "+str(tweet_id))
+        # else:
+        #     print("tweet is exist")
+        # result = 1
+    except (mysql.connector.errors.ProgrammingError) as e:
+        print (e)
+        cnn.rollback()
+    finally:
+        cur.close()
+        cnn.close()
+
+    return rows
+
+
+# 保持しているツイート中一番新しいidと一番古いidを呼び出す
+def selectTweetMinMax(user):
+    result = 0
+
+    try:
+        cnn = dbconnection()
+        cur = cnn.cursor()
+
+        sql = """SELECT MIN(tw.tweet_id), MAX(tw.tweet_id)FROM tweet as tw INNER JOIN account as ac ON tw.user_id = ac.user_id WHERE ac.user = %s"""
+
+        cur.execute(sql, (user,))
+        loggerJSON.debug("sql="+str(cur._executed))
+        row = cur.fetchone()
+        print (row)
+    except (mysql.connector.errors.ProgrammingError) as e:
+        print (e)
+        cnn.rollback()
+    finally:
+        cur.close()
+        cnn.close()
+
+    return row
+
+
+def ExistsTweet(tweet_id):
+    result = False
+
+    try:
+        cnn = dbconnection()
+        cur = cnn.cursor()
+
+        sql = "SELECT count(*) FROM tweet WHERE tweet_id = %s"
+
+        cur.execute(sql, (tweet_id,))
+        loggerJSON.debug("sql="+str(cur._executed))
+        rows = cur.fetchone()
+        logger.info("ExistCheck_tweet="+str(rows[0]))
+
+        if rows[0] > 0:
+            result = True
+    except (mysql.connector.errors.ProgrammingError) as e:
+        print (e)
+        cnn.rollback()
+    finally:
+        cur.close()
+        cnn.close()
+
+    return result
+
 # insertAccount(135856893, "EtonaBySuiko", "えとな・水琥")
 # sys.exit()
 #
